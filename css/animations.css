@@ -1,0 +1,120 @@
+/* ==========================================================
+   PULSEPAL DRIVER — ANIMATIONS.CSS
+   Keyframes used across main.css, components.css, pages.css
+   ========================================================== */
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes dot-pulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.result-icon-success {
+  animation: check-pop 400ms ease;
+}
+
+@keyframes error-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.result-icon-error {
+  animation: error-shake 400ms ease;
+}
+
+@keyframes lock-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.upgrade-lock-icon {
+  animation: lock-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-card {
+  animation: modal-in 200ms ease;
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-overlay {
+  animation: overlay-in 150ms ease;
+}
+
+.content {
+  animation: page-fade-in 200ms ease;
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(2px); }
+}
+
+/* Critical fault card — gentle pulsing red glow, drawing
+   attention without being alarming/flashing */
+@keyframes fault-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.28); }
+  50% { box-shadow: 0 0 0 10px rgba(229, 57, 53, 0); }
+}
+
+.pulsing-fault-card {
+  animation: fault-pulse 1.8s ease-in-out infinite;
+}
