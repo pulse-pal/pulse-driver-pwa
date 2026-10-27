@@ -64,6 +64,31 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ----------------------------------------------------------
+   NATIVE-APP FEEL
+   Text in the UI is not selectable by default, so taps and
+   drags don't highlight labels or place a text caret (e.g.
+   with browser Caret Browsing on), and long-press doesn't open
+   the browser text menu. Inputs stay selectable so typing and
+   editing work. Add class="selectable" to anything the driver
+   should be able to copy (a reference code, a device ID).
+   ---------------------------------------------------------- */
+
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 html, body {
   height: 100%;
   overflow-x: hidden;

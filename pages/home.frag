@@ -60,19 +60,26 @@
   const titleEl = document.getElementById('top-bar-title')
   if (titleEl) titleEl.textContent = `${ACTIVE_VEHICLE.make} ${ACTIVE_VEHICLE.model} ${ACTIVE_VEHICLE.year}`
 
+  // The scale the tick labels were last drawn for. updateDashboard
+  // compares this with getSpeedoMax() every tick and redraws the
+  // ticks if they differ, so the labels and the fill can never
+  // disagree.
+  let renderedSpeedoMax = null
+
   function renderGaugeTicks() {
     const container = document.getElementById('home-gauge-ticks')
     if (!container) return
 
-    const topSpeed = ACTIVE_VEHICLE.top_speed || 180
-    const values = Array.from({ length: 7 }, (_, i) => Math.round((topSpeed / 6) * i / 10) * 10)
+    const speedoMax = getSpeedoMax(ACTIVE_VEHICLE)
+    renderedSpeedoMax = speedoMax
+    const values = Array.from({ length: 7 }, (_, i) => Math.round((speedoMax / 6) * i / 10) * 10)
 
     const cx = 125, cy = 125
     const rDot = 100, rLabel = 118
 
     let html = ''
     values.forEach(v => {
-      const angleDeg = (210 + (v / topSpeed) * 300) % 360
+      const angleDeg = (210 + (v / speedoMax) * 300) % 360
       const rad = angleDeg * Math.PI / 180
       const dotX = cx + rDot * Math.sin(rad)
       const dotY = cy - rDot * Math.cos(rad)
@@ -146,7 +153,9 @@
     const speedEl = document.getElementById('home-speed-value')
     if (!speedEl) return
 
-    const maxSpeed = v.top_speed || 180
+    const maxSpeed = getSpeedoMax(v)
+    if (maxSpeed !== renderedSpeedoMax) renderGaugeTicks()
+
     const speed = Math.max(0, Math.min(v.speed, maxSpeed))
     const pct = speed / maxSpeed
 

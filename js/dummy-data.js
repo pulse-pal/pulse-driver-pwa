@@ -11,6 +11,12 @@ const DRIVER = {
   auto_renew: true
 }
 
+// speedometer_max is the highest number PRINTED on the car's
+// speedometer — it sets the Home gauge scale so the app matches
+// the dash. It is NOT the car's real top speed.
+// speedometer_max_source: 'installer' | 'ai_lookup' | 'default'
+// vehicle_type: 'car' | 'suv' | 'pickup' | 'van' | 'matatu' | 'bus' | 'lorry' | 'truck'
+// Always read the scale through getSpeedoMax(vehicle), never directly.
 const VEHICLES = [
   {
     id: 1,
@@ -19,8 +25,10 @@ const VEHICLES = [
     make: "Toyota",
     model: "Corolla Axio",
     year: 2018,
+    vehicle_type: "car",
     tank_size: 42,
-    top_speed: 180,
+    speedometer_max: 180,
+    speedometer_max_source: "installer",
     active: true,
     status: "active",
     speed: 67,
@@ -48,8 +56,10 @@ const VEHICLES = [
     make: "Subaru",
     model: "Forester",
     year: 2019,
+    vehicle_type: "suv",
     tank_size: 60,
-    top_speed: 195,
+    speedometer_max: 195,
+    speedometer_max_source: "installer",
     active: false,
     status: "active",
     speed: 0,
@@ -73,6 +83,29 @@ const VEHICLES = [
 ]
 
 let ACTIVE_VEHICLE = VEHICLES[0]
+
+// Fallback gauge scale per vehicle type, used only when a vehicle
+// has no speedometer_max of its own (no installer entry, no
+// AI lookup match, or the lookup failed).
+const SPEEDO_MAX_DEFAULT_LIGHT = 180   // car, suv, pickup, van
+const SPEEDO_MAX_DEFAULT_HEAVY = 120   // matatu, bus, lorry, truck
+const HEAVY_VEHICLE_TYPES = ["matatu", "bus", "lorry", "truck"]
+
+// The single source of truth for the gauge scale. Every gauge use
+// (fill, ticks, tick labels, simulation speed clamp) goes through
+// this function. Works unchanged once real backend vehicle records
+// replace the dummy array, as long as they carry the same fields.
+function getSpeedoMax(vehicle) {
+  if (vehicle && Number(vehicle.speedometer_max) > 0) {
+    return Number(vehicle.speedometer_max)
+  }
+  const type = vehicle && vehicle.vehicle_type
+    ? String(vehicle.vehicle_type).toLowerCase()
+    : "car"
+  return HEAVY_VEHICLE_TYPES.includes(type)
+    ? SPEEDO_MAX_DEFAULT_HEAVY
+    : SPEEDO_MAX_DEFAULT_LIGHT
+}
 
 // Set by fuel-navigator.frag when a destination is chosen,
 // read by map.frag to render the route + fuel zones. Cleared
@@ -131,6 +164,8 @@ const SHARED_USERS = [
 // account. add-vehicle.frag searches this pool, mirroring how
 // onboarding-device.frag searches VEHICLES during account creation.
 // Once claimed, an entry is removed here and pushed into VEHICLES.
+// firmware_version lives on the device record (devices.firmware_version
+// in the DB), so it is copied onto the vehicle when the device is claimed.
 const AVAILABLE_DEVICES = [
   {
     device_code: "PULSE-0099",
@@ -138,8 +173,11 @@ const AVAILABLE_DEVICES = [
     make: "Mazda",
     model: "Demio",
     year: 2020,
+    vehicle_type: "car",
     tank_size: 38,
-    top_speed: 165
+    speedometer_max: 165,
+    speedometer_max_source: "ai_lookup",
+    firmware_version: "v2.1.4"
   },
   {
     device_code: "PULSE-0112",
@@ -147,8 +185,11 @@ const AVAILABLE_DEVICES = [
     make: "Toyota",
     model: "Hilux",
     year: 2021,
+    vehicle_type: "pickup",
     tank_size: 76,
-    top_speed: 175
+    speedometer_max: 175,
+    speedometer_max_source: "installer",
+    firmware_version: "v2.1.2"
   }
 ]
 

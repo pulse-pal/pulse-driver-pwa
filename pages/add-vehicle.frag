@@ -132,8 +132,10 @@
         make: foundDevice.make,
         model: foundDevice.model,
         year: foundDevice.year,
+        vehicle_type: foundDevice.vehicle_type,
         tank_size: foundDevice.tank_size,
-        top_speed: foundDevice.top_speed,
+        speedometer_max: foundDevice.speedometer_max,
+        speedometer_max_source: foundDevice.speedometer_max_source,
         active: false,
         status: "active",
         speed: 0,
@@ -149,7 +151,10 @@
         lng: 36.8172,
         fault_codes: [],
         distance_today: 0,
-        last_updated: "Just now"
+        last_updated: "Just now",
+        signal_strength: "strong",
+        last_sync: "Just now",
+        firmware_version: foundDevice.firmware_version
       }
 
       VEHICLES.push(newVehicle)

@@ -171,7 +171,7 @@ function fireServiceNotification(reminder, threshold) {
 
 function startLiveDataSimulation() {
   setInterval(() => {
-    const maxSpeed = ACTIVE_VEHICLE.top_speed || 180
+    const maxSpeed = getSpeedoMax(ACTIVE_VEHICLE)
 
     ACTIVE_VEHICLE.speed += (Math.random() - 0.5) * 4
     ACTIVE_VEHICLE.speed = Math.max(0, Math.min(maxSpeed, ACTIVE_VEHICLE.speed))
