@@ -1,33 +1,24 @@
-<div class="onboarding-page">
-  <button class="onboarding-back" id="password-back-btn" aria-label="Back">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  </button>
+<div class="auth-page">
 
-  <div class="progress-dots">
-    <span class="filled"></span>
-    <span class="filled"></span>
-    <span class="filled"></span>
+  <div class="auth-header">
+    <div class="auth-topbar">
+      <button class="auth-back" id="password-back-btn" aria-label="Back">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 19L8 12L15 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <h1 class="auth-title" id="password-title">Create Your Password</h1>
+    <p class="auth-subtitle" id="password-subtitle">You'll use your phone number and password to login</p>
   </div>
 
-  <div class="onboarding-body">
+  <div class="auth-card">
 
-    <div class="onboarding-icon">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/>
-        <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-        <circle cx="12" cy="15" r="1.4" fill="currentColor"/>
-      </svg>
-    </div>
-    <h1 class="onboarding-heading">Create Your Password</h1>
-    <p class="onboarding-subtext">You'll use your phone number and password to login</p>
-
-    <div class="field">
-      <label class="field-label">Password</label>
-      <div class="input-wrap">
-        <input type="password" class="input" id="password-input" placeholder="At least 6 characters">
-        <button class="input-icon-btn" id="password-toggle" type="button" aria-label="Show password">
+    <div class="auth-field">
+      <label class="auth-field-label" for="password-input">Password</label>
+      <div class="auth-input-wrap">
+        <input type="password" class="auth-input has-eye" id="password-input" placeholder="At least 6 characters" autocomplete="new-password">
+        <button class="auth-eye" id="password-toggle" type="button" aria-label="Show password">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M2 12C2 12 5.5 5.5 12 5.5C18.5 5.5 22 12 22 12C22 12 18.5 18.5 12 18.5C5.5 18.5 2 12 2 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
             <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
@@ -36,28 +27,27 @@
       </div>
     </div>
 
-    <div class="field">
-      <label class="field-label">Confirm Password</label>
-      <div class="input-wrap">
-        <input type="password" class="input" id="password-confirm-input" placeholder="Re-enter password">
-        <button class="input-icon-btn" id="password-confirm-toggle" type="button" aria-label="Show password">
+    <div class="auth-field">
+      <label class="auth-field-label" for="password-confirm-input">Confirm Password</label>
+      <div class="auth-input-wrap">
+        <input type="password" class="auth-input has-eye" id="password-confirm-input" placeholder="Re-enter password" autocomplete="new-password">
+        <button class="auth-eye" id="password-confirm-toggle" type="button" aria-label="Show password">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M2 12C2 12 5.5 5.5 12 5.5C18.5 5.5 22 12 22 12C22 12 18.5 18.5 12 18.5C5.5 18.5 2 12 2 12Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
             <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
           </svg>
         </button>
       </div>
-      <p id="password-error" style="font-size:11.5px;color:var(--color-danger);margin-top:4px;min-height:16px;"></p>
+      <p class="auth-error" id="password-error"></p>
     </div>
 
-  </div>
-
-  <div class="onboarding-footer">
-    <button class="btn btn-primary" id="password-submit-btn">
-      <span class="btn-spinner"></span>
+    <button class="auth-btn" id="password-submit-btn">
+      <span class="auth-btn-spinner"></span>
       <span id="password-submit-btn-text">CREATE ACCOUNT</span>
     </button>
+
   </div>
+
 </div>
 
 <script>
@@ -70,6 +60,23 @@
   const errorText = document.getElementById('password-error')
   const submitBtn = document.getElementById('password-submit-btn')
   const submitBtnText = document.getElementById('password-submit-btn-text')
+
+  // This screen is shared by three paths:
+  //   password reset   -> new password, then back to Login
+  //   fleet activation -> the account already exists (added by the fleet
+  //                       manager), so they are setting a password, and
+  //                       the next step is the fleet welcome screen
+  //   new individual   -> creates the account, then Subscribe
+  const resetFlow = window.pulsepalAuthFlow === 'reset'
+  const fleet = isFleetDriver()
+
+  if (resetFlow) {
+    document.getElementById('password-title').textContent = 'Reset Your Password'
+    document.getElementById('password-subtitle').textContent = 'Choose a new password for your account.'
+    submitBtnText.textContent = 'RESET PASSWORD'
+  } else if (fleet) {
+    submitBtnText.textContent = 'SET PASSWORD'
+  }
 
   backBtn.addEventListener('click', () => navigateTo('onboarding-verify'))
 
@@ -91,12 +98,23 @@
       return
     }
 
-    submitBtn.classList.add('btn-loading')
+    submitBtn.classList.add('is-loading')
     submitBtn.disabled = true
-    submitBtnText.textContent = 'Creating account...'
+    submitBtnText.textContent = resetFlow
+      ? 'Updating password...'
+      : (fleet ? 'Saving password...' : 'Creating account...')
 
     setTimeout(() => {
-      navigateTo('subscribe')
+      if (resetFlow) {
+        window.pulsepalAuthFlow = null
+        navigateTo('login')
+        showToast('Password updated. Please sign in.', 'success')
+      } else if (fleet) {
+        localStorage.setItem('pulsepal_fleet_activated', 'true')
+        navigateTo('fleet-welcome')
+      } else {
+        navigateTo('subscribe')
+      }
     }, 900)
   })
 })()

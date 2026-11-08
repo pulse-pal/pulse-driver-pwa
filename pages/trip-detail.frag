@@ -118,6 +118,26 @@
   }
 
   function renderLocked() {
+    // Fleet drivers never see prices or an upgrade button: their fleet
+    // manager decides what the fleet's plan includes.
+    if (isFleetDriver()) {
+      body.innerHTML = `
+        <div class="card" style="text-align:center;padding:32px 20px;">
+          <div class="upgrade-lock-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V8a4 4 0 018 0v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+          <p style="font-size:16px;font-weight:700;color:var(--color-heading);" id="trip-fleet-title"></p>
+          <p style="font-size:12.5px;color:var(--color-text-secondary);margin:6px 0 20px;line-height:1.5;" id="trip-fleet-text"></p>
+          <button class="btn btn-primary" id="trip-fleet-call-btn" style="border-radius:999px;">CALL FLEET MANAGER</button>
+        </div>
+      `
+      document.getElementById('trip-fleet-title').textContent = `${trip.start} to ${trip.end}`
+      document.getElementById('trip-fleet-text').textContent =
+        `Not available on your fleet's plan. Ask ${DRIVER.manager_name || 'your fleet manager'} to enable it.`
+      document.getElementById('trip-fleet-call-btn').addEventListener('click', callFleetManager)
+      return
+    }
+
     body.innerHTML = `
       <div class="card" style="text-align:center;padding:32px 20px;">
         <div class="upgrade-lock-icon">
@@ -319,7 +339,7 @@
 
   if (!trip) {
     renderEmpty()
-  } else if (DRIVER.plan !== 'premium') {
+  } else if (!canUse('driving_score')) {
     renderLocked()
   } else {
     renderTrip()

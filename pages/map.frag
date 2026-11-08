@@ -60,8 +60,8 @@
           <span class="toggle-track"></span>
         </label>
       </div>
-      <div style="border-top:1px solid var(--color-border);margin-top:12px;padding-top:12px;">
-        <button id="map-speed-alert-settings-link" style="display:flex;align-items:center;justify-content:space-between;width:100%;font-size:12.5px;font-weight:600;color:${DRIVER.plan === 'premium' ? 'var(--color-accent)' : 'var(--color-text-secondary)'};">
+      <div id="map-speed-alert-settings-row" style="border-top:1px solid var(--color-border);margin-top:12px;padding-top:12px;">
+        <button id="map-speed-alert-settings-link" style="display:flex;align-items:center;justify-content:space-between;width:100%;font-size:12.5px;font-weight:600;">
           <span>Speed Alert Settings</span>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
@@ -86,6 +86,13 @@
   const OSM_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
   const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving'
   const ROUTE_LABELS = ['Fastest', 'Route 2', 'Route 3', 'Route 4']
+
+  // What this account can use on the map. Decided by the shared gate,
+  // not the plan name. Fleet drivers whose plan lacks a feature don't
+  // see a button for it; individual drivers keep their existing
+  // upgrade prompts.
+  const speedAlertsAllowed = canUse('speed_alerts')
+  const fuelNavAllowed = canUse('fuel_navigator')
 
   function currentConsumptionRate() {
     return Math.max(RATE_BASE + (v.speed - BASE_SPEED) * SENSITIVITY, 6)
@@ -183,13 +190,23 @@
     const speedLimit = 80
     const withinLimit = v.speed <= speedLimit
     let cameraAlertHtml = ''
-    if (DRIVER.plan === 'premium') {
+    if (speedAlertsAllowed) {
       const cam = SPEED_CAMERAS[0]
       cameraAlertHtml = `
         <div class="map-camera-alert" style="border-radius:14px;padding:14px;">
           <p style="font-weight:700;font-size:13.5px;color:var(--color-warning);">Speed Camera Ahead</p>
           <p style="font-size:13px;margin-top:4px;color:var(--color-text-primary);">${cam.road} — ${cam.distance}</p>
           <p style="font-size:12px;color:var(--color-text-secondary);margin-top:2px;">Limit: ${cam.speed_limit} km/h</p>
+        </div>
+      `
+    } else if (isFleetDriver()) {
+      // Fleet driver without speed alerts: no price, no upgrade.
+      cameraAlertHtml = `
+        <div style="text-align:center;padding:18px 12px;background:var(--color-bg-card);border-radius:14px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin:0 auto;color:var(--color-text-secondary);"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <p style="font-weight:700;font-size:13px;margin-top:8px;color:var(--color-text-primary);">Speed camera alerts</p>
+          <p id="map-fleet-lock-text" style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;line-height:1.5;"></p>
+          <button class="btn btn-primary btn-sm" id="map-fleet-call-btn" style="margin-top:10px;width:auto;border-radius:999px;">CALL FLEET MANAGER</button>
         </div>
       `
     } else {
@@ -214,6 +231,13 @@
     const upgradeBtn = document.getElementById('map-upgrade-btn')
     if (upgradeBtn) upgradeBtn.addEventListener('click', () => checkPremium('speed_camera_alerts'))
 
+    const fleetCallBtn = document.getElementById('map-fleet-call-btn')
+    if (fleetCallBtn) {
+      document.getElementById('map-fleet-lock-text').textContent =
+        `Not available on your fleet's plan. Ask ${DRIVER.manager_name || 'your fleet manager'} to enable it.`
+      fleetCallBtn.addEventListener('click', callFleetManager)
+    }
+
     driverMapInstance = L.map('leaflet-map', { zoomControl: false, attributionControl: false }).setView([v.lat, v.lng], 15)
     driverMapTileStandard = L.tileLayer(OSM_URL, { subdomains: 'abc', maxZoom: 19 }).addTo(driverMapInstance)
     driverMapTileSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })
@@ -233,13 +257,30 @@
 
   /* ==========================================================
      FUEL ROUTE MODE
+
+     ACTIVE_FUEL_ROUTE.status:
+       'preview'  route chosen, not started. Nothing is saved.
+       'active'   started. Saved by app.js, which also advances
+                  distanceTraveled while the driver is on any screen.
+     The Map only draws the route; it does not own the progress.
      ========================================================== */
   let routeLayers = []
-  let routeDistanceTraveled = 0
   let vehicleMarker = null
   let roadCoords = null
   let roadCum = null
   let sheetInitialized = false
+  // What the sheet was last built for. Same key = only update the
+  // numbers (so buttons aren't rebuilt under the driver's finger).
+  let renderedSheetKey = null
+
+  function isMapMounted() {
+    return !!document.getElementById('map-sheet-content')
+  }
+
+  // Km driven along the route. Zero until the trip is started.
+  function traveledKm(route) {
+    return route.status === 'active' ? (route.distanceTraveled || 0) : 0
+  }
 
   function stationIcon() {
     return L.divIcon({
@@ -251,20 +292,103 @@
     })
   }
 
+  // A small confirm dialog. It lives on <body>, outside the page, so
+  // it is removed BEFORE running the action (otherwise it would stay
+  // on top of whatever screen comes next).
+  function confirmDialog(opts) {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    overlay.innerHTML = `
+      <div class="modal-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:6px;" data-role="title"></h3>
+        <p style="font-size:13px;color:var(--color-text-secondary);" data-role="text"></p>
+        <button class="btn ${opts.danger ? 'btn-danger' : 'btn-primary'}" data-role="ok" style="margin:18px 0 10px;"></button>
+        <button class="btn btn-ghost" data-role="cancel"></button>
+      </div>
+    `
+    document.body.appendChild(overlay)
+    overlay.querySelector('[data-role="title"]').textContent = opts.title
+    overlay.querySelector('[data-role="text"]').textContent = opts.text
+    overlay.querySelector('[data-role="ok"]').textContent = opts.confirmLabel
+    overlay.querySelector('[data-role="cancel"]').textContent = opts.cancelLabel
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
+    overlay.querySelector('[data-role="cancel"]').addEventListener('click', () => overlay.remove())
+    overlay.querySelector('[data-role="ok"]').addEventListener('click', () => {
+      overlay.remove()
+      opts.onConfirm()
+    })
+  }
+
+  function renderRouteHeader() {
+    const route = ACTIVE_FUEL_ROUTE
+    const header = document.getElementById('map-floating-header')
+    if (!route || !header) return
+
+    header.innerHTML = `<span id="map-route-title"></span> <button id="map-exit-route-btn" aria-label="Close route" style="float:right;background:none;border:none;color:var(--color-text-secondary);display:flex;align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>`
+    document.getElementById('map-route-title').textContent =
+      (route.status === 'active' ? 'Drive to ' : 'Route to ') + route.destinationName
+    document.getElementById('map-exit-route-btn').addEventListener('click', closeRoute)
+  }
+
+  // Leaves the route view and the trip with it.
+  function exitRoute() {
+    clearActiveTrip()
+    navigateTo('map')
+  }
+
+  // X in the header and END TRIP: a running trip asks first.
+  function closeRoute() {
+    const route = ACTIVE_FUEL_ROUTE
+    if (route && route.status === 'active' && !route.arrived) {
+      confirmDialog({
+        title: 'End trip?',
+        text: `Stop your trip to ${route.destinationName}? You can plan a new one any time.`,
+        confirmLabel: 'END TRIP',
+        cancelLabel: 'KEEP GOING',
+        danger: true,
+        onConfirm: exitRoute
+      })
+      return
+    }
+    exitRoute()
+  }
+
+  // Turn-by-turn is left to Google Maps. No origin is sent, so Google
+  // uses the phone's own location.
+  function openInGoogleMaps(route) {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${route.lat},${route.lng}&travelmode=driving`
+    window.open(url, '_blank', 'noopener')
+  }
+
+  function startTrip(alsoOpenGoogleMaps) {
+    const route = ACTIVE_FUEL_ROUTE
+    if (!route) return
+    route.status = 'active'
+    route.distanceTraveled = 0
+    route.arrived = false
+    persistActiveTrip()
+
+    // Open Google Maps inside this tap, so the browser allows it.
+    if (alsoOpenGoogleMaps) openInGoogleMaps(route)
+
+    showToast(`Trip to ${route.destinationName} started`, 'success')
+    renderRouteHeader()
+    renderedSheetKey = null
+    drawRoute(true)
+  }
+
   async function renderFuelRoute() {
     const route = ACTIVE_FUEL_ROUTE
     if (!route) return
 
-    routeDistanceTraveled = 0
+    if (!route.status) route.status = 'preview'
     roadCoords = null
     roadCum = null
     sheetInitialized = false
+    renderedSheetKey = null
 
-    document.getElementById('map-floating-header').innerHTML = `<span>Drive to ${route.destinationName}</span> <button id="map-exit-route-btn" style="float:right;background:none;border:none;color:var(--color-text-secondary);display:flex;align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>`
-    document.getElementById('map-exit-route-btn').addEventListener('click', () => {
-      ACTIVE_FUEL_ROUTE = null
-      navigateTo('map')
-    })
+    renderRouteHeader()
 
     document.getElementById('map-legend').innerHTML = `
       <div style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:4px;background:#22A559;"></span> Comfortable</div>
@@ -281,19 +405,25 @@
     try {
       const options = await fetchRoadRouteOptions({ lat: v.lat, lng: v.lng }, { lat: route.lat, lng: route.lng })
       route.routeOptions = options
-      route.selectedRouteIndex = 0
-      const sel = options[0]
+      // Keep the route the driver chose earlier (clamped in case fewer
+      // options come back this time).
+      const idx = Math.min(route.selectedRouteIndex || 0, options.length - 1)
+      route.selectedRouteIndex = idx
+      const sel = options[idx]
       roadCoords = sel.coords
       roadCum = sel.cum
       route.distance_km = Math.round(sel.totalKm)
       route.duration_min = Math.round(sel.totalDurationMin)
+      route.total_km = sel.totalKm
     } catch (err) {
       console.error(err)
       showToast('Could not load road route — check connection', 'danger')
       route.routeOptions = null
       roadCoords = [[v.lat, v.lng], [route.lat, route.lng]]
       roadCum = buildCumulative(roadCoords)
+      route.total_km = roadCum[roadCum.length - 1]
     }
+    persistActiveTrip()
 
     setTimeout(() => {
       driverMapInstance.invalidateSize()
@@ -306,7 +436,8 @@
   }
 
   // Switches which route is active. Progress along the road doesn't
-  // carry over since the two roads diverge, so it resets to 0.
+  // carry over since the two roads diverge, so a running trip restarts
+  // its count from the car's position.
   function selectRouteOption(idx) {
     const route = ACTIVE_FUEL_ROUTE
     if (!route || !route.routeOptions || !route.routeOptions[idx]) return
@@ -316,7 +447,13 @@
     roadCum = sel.cum
     route.distance_km = Math.round(sel.totalKm)
     route.duration_min = Math.round(sel.totalDurationMin)
-    routeDistanceTraveled = 0
+    route.total_km = sel.totalKm
+    if (route.status === 'active') {
+      route.distanceTraveled = 0
+      route.arrived = false
+      persistActiveTrip()
+    }
+    renderedSheetKey = null
     drawRoute(true)
   }
 
@@ -342,24 +479,41 @@
     `
   }
 
+  function remeasureSheet() {
+    const sheet = document.getElementById('map-info-sheet')
+    if (sheetInitialized && sheet && sheet._sheetRemeasure) {
+      sheet._sheetRemeasure()
+    }
+  }
+
   function drawRoute(isInitial) {
     const route = ACTIVE_FUEL_ROUTE
-    if (!route || !driverMapInstance || !roadCoords) return
+    if (!route || !driverMapInstance || !roadCoords || !isMapMounted()) return
 
     routeLayers.forEach(l => driverMapInstance.removeLayer(l))
     routeLayers = []
 
     const destKm = roadCum[roadCum.length - 1]
-    const basisKm = Math.min(routeDistanceTraveled, destKm)
+    const basisKm = Math.min(traveledKm(route), destKm)
     const remainingKm = destKm - basisKm
 
-    if (remainingKm <= 0.1) {
+    if (route.arrived || remainingKm <= 0.1) {
       const endIcon = L.divIcon({ className: '', html: `<div style="width:18px;height:18px;border-radius:50%;background:#00C853;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);"></div>`, iconSize: [18, 18], iconAnchor: [9, 9] })
       const endPoint = pointAtDistance(roadCoords, roadCum, destKm)
       const m = L.marker(endPoint, { icon: endIcon }).addTo(driverMapInstance).bindPopup(`Arrived at ${route.destinationName}`).openPopup()
       routeLayers.push(m)
-      document.getElementById('map-sheet-content').innerHTML = `<p class="sheet-title">Arrived at ${route.destinationName}</p>`
       if (isInitial) driverMapInstance.setView(endPoint, 12)
+
+      if (renderedSheetKey !== 'arrived') {
+        renderedSheetKey = 'arrived'
+        document.getElementById('map-sheet-content').innerHTML = `
+          <p class="sheet-title" id="map-fr-arrived-title"></p>
+          <button class="btn btn-primary" id="map-fr-done-btn" style="margin-top:16px;border-radius:999px;">DONE</button>
+        `
+        document.getElementById('map-fr-arrived-title').textContent = `Arrived at ${route.destinationName}`
+        document.getElementById('map-fr-done-btn').addEventListener('click', exitRoute)
+        remeasureSheet()
+      }
       return
     }
 
@@ -431,55 +585,116 @@
     updateFuelRouteSheet(remainingKm, rate)
   }
 
-  function updateFuelRouteSheet(remainingKm, rate) {
-    const fuelNeeded = remainingKm * rate / 100
-    const mins = ACTIVE_FUEL_ROUTE.duration_min
-      ? Math.round(ACTIVE_FUEL_ROUTE.duration_min * (remainingKm / roadCum[roadCum.length - 1]))
-      : Math.round((remainingKm / 75) * 60)
-    const hrs = Math.floor(mins / 60)
-    const remMins = mins % 60
-    const durationText = hrs > 0 ? `${hrs}h ${remMins}m` : `${remMins}m`
-
+  // Builds the sheet once per state (preview / active / chosen route);
+  // after that only the numbers are refreshed.
+  function renderSheet(route, rate) {
+    const active = route.status === 'active'
     document.getElementById('map-sheet-content').innerHTML = `
-      <p class="sheet-title">${Math.round(remainingKm)}km</p>
-      <div class="fault-info-row" style="margin-top:14px;"><span>Duration</span><span style="font-weight:700;">${durationText}</span></div>
-      <div class="fault-info-row"><span>Fuel needed</span><span style="font-weight:700;">${fuelNeeded.toFixed(1)}L</span></div>
-      ${routeCardsHtml(ACTIVE_FUEL_ROUTE, rate)}
+      <p class="sheet-title" id="map-fr-km"></p>
+      <div class="fault-info-row" style="margin-top:14px;"><span>Duration</span><span style="font-weight:700;" id="map-fr-duration"></span></div>
+      <div class="fault-info-row"><span>Fuel needed</span><span style="font-weight:700;" id="map-fr-fuel"></span></div>
+      ${routeCardsHtml(route, rate)}
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+        ${active ? `
+          <button class="btn btn-outline" id="map-fr-gmaps-btn" style="border-radius:999px;">OPEN IN GOOGLE MAPS</button>
+          <button class="btn btn-ghost" id="map-fr-end-btn" style="color:var(--color-danger);">END TRIP</button>
+        ` : `
+          <button class="btn btn-primary" id="map-fr-start-btn" style="border-radius:999px;">START TRIP</button>
+          <button class="btn btn-outline" id="map-fr-start-gmaps-btn" style="border-radius:999px;">START AND OPEN GOOGLE MAPS</button>
+        `}
+      </div>
     `
 
     document.querySelectorAll('.fn-route-card').forEach(btn => {
       btn.addEventListener('click', () => selectRouteOption(Number(btn.dataset.idx)))
     })
 
-    // Sheet content changed shape (new numbers, possibly different
-    // line count) — re-run the collapse-height calculation so it
-    // stays accurate, without re-binding the drag listeners again
-    const sheet = document.getElementById('map-info-sheet')
-    if (sheetInitialized && sheet && sheet._sheetRemeasure) {
-      sheet._sheetRemeasure()
-    }
+    const startBtn = document.getElementById('map-fr-start-btn')
+    if (startBtn) startBtn.addEventListener('click', () => startTrip(false))
+    const startGmapsBtn = document.getElementById('map-fr-start-gmaps-btn')
+    if (startGmapsBtn) startGmapsBtn.addEventListener('click', () => startTrip(true))
+    const gmapsBtn = document.getElementById('map-fr-gmaps-btn')
+    if (gmapsBtn) gmapsBtn.addEventListener('click', () => openInGoogleMaps(route))
+    const endBtn = document.getElementById('map-fr-end-btn')
+    if (endBtn) endBtn.addEventListener('click', closeRoute)
   }
 
-  window.__pulsepalNavigateToStation = async function (lat, lng, label) {
+  function updateFuelRouteSheet(remainingKm, rate) {
+    const route = ACTIVE_FUEL_ROUTE
+    const key = `${route.status}|${route.selectedRouteIndex || 0}`
+
+    if (key !== renderedSheetKey) {
+      renderedSheetKey = key
+      renderSheet(route, rate)
+      remeasureSheet()
+    }
+
+    const fuelNeeded = remainingKm * rate / 100
+    const mins = route.duration_min
+      ? Math.round(route.duration_min * (remainingKm / roadCum[roadCum.length - 1]))
+      : Math.round((remainingKm / 75) * 60)
+    const hrs = Math.floor(mins / 60)
+    const remMins = mins % 60
+    const durationText = hrs > 0 ? `${hrs}h ${remMins}m` : `${remMins}m`
+
+    const kmEl = document.getElementById('map-fr-km')
+    const durEl = document.getElementById('map-fr-duration')
+    const fuelEl = document.getElementById('map-fr-fuel')
+    if (kmEl) kmEl.textContent = `${Math.round(remainingKm)}km`
+    if (durEl) durEl.textContent = durationText
+    if (fuelEl) fuelEl.textContent = `${fuelNeeded.toFixed(1)}L`
+  }
+
+  async function goToStation(lat, lng, label) {
+    // Heading to a fuel stop replaces any trip that was running.
+    removeStoredTrip()
     document.getElementById('map-sheet-content').innerHTML = `<p class="sheet-title">Calculating route...</p>`
-    ACTIVE_FUEL_ROUTE = { destinationName: `Fuel Stop (${label})`, lat, lng, distance_km: 0 }
-    routeDistanceTraveled = 0
+    ACTIVE_FUEL_ROUTE = {
+      destinationName: `Fuel Stop (${label})`,
+      lat,
+      lng,
+      distance_km: 0,
+      status: 'preview',
+      selectedRouteIndex: 0
+    }
+    renderedSheetKey = null
+    renderRouteHeader()
     try {
       const result = await fetchRoadRoute({ lat: v.lat, lng: v.lng }, { lat, lng })
       roadCoords = result.coords
       roadCum = result.cum
       ACTIVE_FUEL_ROUTE.distance_km = Math.round(result.totalKm)
       ACTIVE_FUEL_ROUTE.duration_min = Math.round(result.totalDurationMin)
+      ACTIVE_FUEL_ROUTE.total_km = result.totalKm
       drawRoute(true)
     } catch (err) {
       showToast('Could not load road route', 'danger')
     }
   }
 
+  window.__pulsepalNavigateToStation = function (lat, lng, label) {
+    const current = ACTIVE_FUEL_ROUTE
+    if (current && current.status === 'active' && !current.arrived) {
+      confirmDialog({
+        title: 'Change your trip?',
+        text: `Going to this fuel stop ends your trip to ${current.destinationName}.`,
+        confirmLabel: 'GO TO FUEL STOP',
+        cancelLabel: 'KEEP CURRENT TRIP',
+        danger: false,
+        onConfirm: () => goToStation(lat, lng, label)
+      })
+      return
+    }
+    goToStation(lat, lng, label)
+  }
+
+  // Called by app.js every tick. app.js has already moved the trip
+  // forward; this only redraws it. Does nothing in preview, or if the
+  // Map is not the screen currently showing.
   window.updateFuelRoute = function () {
-    if (!ACTIVE_FUEL_ROUTE || !driverMapInstance || !roadCoords) return
-    const kmThisTick = v.speed * (3 / 3600)
-    routeDistanceTraveled += kmThisTick
+    const route = ACTIVE_FUEL_ROUTE
+    if (!route || route.status !== 'active') return
+    if (!driverMapInstance || !roadCoords || !isMapMounted()) return
     drawRoute(false)
   }
 
@@ -503,7 +718,14 @@
   document.getElementById('layers-toggle-cameras').addEventListener('change', (e) => { if (typeof toggleDriverMapLayer === 'function') toggleDriverMapLayer('cameras', e.target.checked) })
   document.getElementById('layers-toggle-reports').addEventListener('change', (e) => { if (typeof toggleDriverMapLayer === 'function') toggleDriverMapLayer('reports', e.target.checked) })
 
-  document.getElementById('map-speed-alert-settings-link').addEventListener('click', () => {
+  // Speed Alert Settings: orange when the account can use speed alerts,
+  // grey when not. Hidden for fleet drivers whose plan lacks them.
+  const speedAlertLink = document.getElementById('map-speed-alert-settings-link')
+  speedAlertLink.style.color = speedAlertsAllowed ? 'var(--color-accent)' : 'var(--color-text-secondary)'
+  if (isFleetDriver() && !speedAlertsAllowed) {
+    document.getElementById('map-speed-alert-settings-row').classList.add('hidden')
+  }
+  speedAlertLink.addEventListener('click', () => {
     layersPanel.classList.add('hidden')
     if (checkPremium('speed_camera_alerts')) navigateTo('speed-alerts')
   })
@@ -515,9 +737,17 @@
       driverMapInstance.setView(center, 15)
     }
   })
-  document.getElementById('map-fuel-nav-fab').addEventListener('click', () => {
-    if (checkPremium('fuel_navigator')) navigateTo('fuel-navigator')
-  })
+
+  // Fuel Navigator button: hidden for fleet drivers whose plan lacks
+  // it; individual drivers keep it (Starter gets the upgrade prompt).
+  const fuelNavFab = document.getElementById('map-fuel-nav-fab')
+  if (isFleetDriver() && !fuelNavAllowed) {
+    fuelNavFab.classList.add('hidden')
+  } else {
+    fuelNavFab.addEventListener('click', () => {
+      if (checkPremium('fuel_navigator')) navigateTo('fuel-navigator')
+    })
+  }
 
   if (ACTIVE_FUEL_ROUTE) {
     renderFuelRoute()

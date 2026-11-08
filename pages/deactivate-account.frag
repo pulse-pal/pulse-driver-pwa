@@ -77,6 +77,9 @@
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
     document.getElementById('da-final-cancel').addEventListener('click', () => overlay.remove())
     document.getElementById('da-final-confirm').addEventListener('click', () => {
+      // The dialog lives on <body>, outside the page, so it has to be
+      // removed here or it stays on top of the Login screen.
+      overlay.remove()
       localStorage.removeItem('pulsepal_logged_in')
       navigateTo('login')
       showToast('Your account has been deactivated', 'success')

@@ -72,13 +72,13 @@
       <p style="font-size:15px;font-weight:700;color:var(--color-heading);" id="settings-name"></p>
       <p style="font-size:12px;color:var(--color-text-secondary);margin-top:2px;" id="settings-phone"></p>
     </div>
-    <span class="badge badge-premium" id="settings-plan-badge"></span>
+    <span class="badge badge-premium" id="settings-plan-badge" data-requires="subscription"></span>
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--color-text-secondary);flex-shrink:0;"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </div>
 
   <p class="st-group-label">Vehicles &amp; Hardware</p>
   <div class="st-group-card">
-    <div class="st-row" id="settings-my-vehicles-row">
+    <div class="st-row" id="settings-my-vehicles-row" data-requires="my_vehicles">
       <div class="st-row-icon" style="background:rgba(255,122,26,0.1);color:var(--color-accent);">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 13l1.5-5A2 2 0 016.4 6.5h11.2a2 2 0 011.9 1.5L21 13M5 13h14v5a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H8v1a1 1 0 01-1 1H6a1 1 0 01-1-1v-5z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -105,7 +105,7 @@
       <span class="st-row-label">Profile Details</span>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--color-text-secondary);"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
-    <div class="st-row" id="settings-vehicle-sharing-row">
+    <div class="st-row" id="settings-vehicle-sharing-row" data-requires="vehicle_sharing">
       <div class="st-row-icon" style="background:rgba(184,134,11,0.1);color:var(--color-premium);">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="17" cy="8.5" r="2.3" stroke="currentColor" stroke-width="1.6"/><path d="M15.5 13.2c2.3.3 4 2 4 4.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </div>
@@ -123,15 +123,44 @@
     </div>
   </div>
 
-  <p class="st-group-label">Billing &amp; Subscriptions</p>
-  <div class="st-group-card">
-    <div class="st-row" id="settings-subscription-row">
-      <div class="st-row-icon" style="background:rgba(255,122,26,0.1);color:var(--color-accent);">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.6"/></svg>
+  <div id="settings-fleet-section" class="hidden">
+    <p class="st-group-label">My Fleet</p>
+    <div class="st-group-card">
+      <div class="st-row" style="cursor:default;">
+        <div class="st-row-icon" style="background:rgba(255,122,26,0.1);color:var(--color-accent);">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 6H14V16H2V6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 10H18L21 13V16H14V10Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="7" cy="17.5" r="1.8" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="17.5" r="1.8" stroke="currentColor" stroke-width="1.6"/></svg>
+        </div>
+        <span class="st-row-label">Fleet</span>
+        <span class="st-row-value" id="settings-fleet-name"></span>
       </div>
-      <span class="st-row-label">My Subscription</span>
-      <span class="st-row-value" id="settings-plan-value"></span>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--color-text-secondary);"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="st-row" style="cursor:default;">
+        <div class="st-row-icon" style="background:rgba(59,130,246,0.1);color:#3B82F6;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5 19c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <span class="st-row-label">Fleet manager</span>
+        <span class="st-row-value" id="settings-fleet-manager"></span>
+      </div>
+      <div class="st-row" id="settings-fleet-call-row">
+        <div class="st-row-icon" style="background:rgba(34,165,89,0.1);color:var(--color-success);">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span class="st-row-label">Call fleet manager</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--color-text-secondary);"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div data-requires="subscription">
+    <p class="st-group-label">Billing &amp; Subscriptions</p>
+    <div class="st-group-card">
+      <div class="st-row" id="settings-subscription-row">
+        <div class="st-row-icon" style="background:rgba(255,122,26,0.1);color:var(--color-accent);">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.6"/></svg>
+        </div>
+        <span class="st-row-label">My Subscription</span>
+        <span class="st-row-value" id="settings-plan-value"></span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--color-text-secondary);"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
     </div>
   </div>
 
@@ -170,7 +199,7 @@
       <span class="st-row-label">Help / FAQ</span>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--color-text-secondary);"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
-    <div class="st-row st-row-danger" id="settings-deactivate-row">
+    <div class="st-row st-row-danger" id="settings-deactivate-row" data-requires="deactivate_account">
       <div class="st-row-icon" style="background:rgba(229,57,53,0.1);color:var(--color-danger);">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0v13a1 1 0 01-1 1H7a1 1 0 01-1-1V7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
@@ -194,14 +223,31 @@
   document.getElementById('settings-avatar').textContent = initials(DRIVER.name)
   document.getElementById('settings-name').textContent = DRIVER.name
   document.getElementById('settings-phone').textContent = DRIVER.phone
-  document.getElementById('settings-plan-badge').textContent = DRIVER.plan === 'premium' ? 'PREMIUM' : 'STARTER'
+
+  // Plan labels exist only for accounts that have a subscription page.
+  // Fleet drivers never see a plan.
+  if (canUse('subscription')) {
+    const planLabel = DRIVER.plan.charAt(0).toUpperCase() + DRIVER.plan.slice(1)
+    document.getElementById('settings-plan-badge').textContent = planLabel.toUpperCase()
+    document.getElementById('settings-plan-value').textContent = planLabel
+  }
 
   document.getElementById('settings-vehicle-count').textContent = `${VEHICLES.length} vehicle${VEHICLES.length === 1 ? '' : 's'}`
   document.getElementById('settings-device-code').textContent = ACTIVE_VEHICLE.device_code
   document.getElementById('settings-shared-count').textContent = `${SHARED_USERS.length} ${SHARED_USERS.length === 1 ? 'person' : 'people'}`
   document.getElementById('settings-lock-status').textContent = SECURITY_SETTINGS.app_lock_enabled ? 'On' : 'Off'
-  document.getElementById('settings-plan-value').textContent = DRIVER.plan === 'premium' ? 'Premium' : 'Starter'
   renderThemeValue()
+
+  // Fleet drivers only: in the slot billing occupies for individuals.
+  if (canUse('fleet_contact')) {
+    document.getElementById('settings-fleet-name').textContent = DRIVER.fleet_name || ''
+    document.getElementById('settings-fleet-manager').textContent = DRIVER.manager_name || ''
+    document.getElementById('settings-fleet-call-row').addEventListener('click', callFleetManager)
+    document.getElementById('settings-fleet-section').classList.remove('hidden')
+  }
+
+  // Hide every row marked data-requires that this account can't use.
+  applyFeatureGating(document.getElementById('settings-page'))
 
   document.getElementById('settings-profile-row').addEventListener('click', () => navigateTo('profile'))
   document.getElementById('settings-my-vehicles-row').addEventListener('click', () => navigateTo('my-vehicles'))

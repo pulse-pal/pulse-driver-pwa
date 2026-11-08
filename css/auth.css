@@ -1,0 +1,425 @@
+/* ==========================================================
+   PULSEPAL DRIVER — AUTH.CSS
+   Shared look for Splash, Welcome, Login and the onboarding
+   screens: an orange header with the title, and a white rounded
+   card holding the form. Loaded after pages.css.
+   Colours come from the theme variables, so light and dark
+   both work; the header stays orange in both.
+   ========================================================== */
+
+:root {
+  --auth-orange: var(--color-accent);
+}
+
+/* ----------------------------------------------------------
+   PAGE SHELL
+   .content has 16px padding; the negative margin makes the
+   orange header run edge to edge and fill the screen height.
+   ---------------------------------------------------------- */
+
+.auth-page {
+  margin: calc(var(--screen-padding) * -1);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--auth-orange);
+}
+
+.auth-header {
+  flex-shrink: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 24px 8px;
+  color: #FFFFFF;
+}
+
+.auth-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+}
+
+.auth-back {
+  width: 44px;
+  height: 44px;
+  margin-left: -10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+}
+
+.auth-header-link {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #FFFFFF;
+  padding: 8px 0 8px 12px;
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #FFFFFF;
+  margin-top: 18px;
+  line-height: 1.25;
+}
+
+.auth-subtitle {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.92);
+  margin-top: 6px;
+  max-width: 280px;
+}
+
+.auth-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-top: 28px;
+  padding: 30px 24px 28px;
+  background: var(--color-card-solid);
+  border-radius: 28px 28px 0 0;
+  color: var(--color-text-primary);
+}
+
+/* ----------------------------------------------------------
+   TEXT PIECES
+   ---------------------------------------------------------- */
+
+.auth-lead {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--color-heading);
+  margin-bottom: 22px;
+}
+
+.auth-hint {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin-bottom: 14px;
+}
+
+.auth-error {
+  font-size: 12px;
+  color: var(--color-danger);
+  margin-top: 8px;
+  min-height: 16px;
+}
+
+.auth-legal {
+  margin-top: auto;
+  padding-top: 20px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.auth-legal a {
+  font-weight: 700;
+  color: var(--color-heading);
+}
+
+.auth-forgot {
+  display: block;
+  margin: 12px 0 22px auto;
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+.auth-wordmark {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: var(--color-accent);
+  text-align: center;
+}
+
+/* ----------------------------------------------------------
+   FIELDS
+   ---------------------------------------------------------- */
+
+.auth-field {
+  margin-bottom: 16px;
+}
+
+.auth-field-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-heading);
+  margin-bottom: 8px;
+}
+
+.auth-input-wrap {
+  position: relative;
+}
+
+.auth-input {
+  width: 100%;
+  height: 52px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  font-size: 14.5px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color var(--transition-fast);
+}
+
+.auth-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.8;
+}
+
+.auth-input:focus {
+  border-color: var(--color-accent);
+}
+
+.auth-input-code {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.auth-input-code::placeholder {
+  letter-spacing: 1.5px;
+  font-weight: 700;
+}
+
+.auth-input-wrap .auth-input.has-eye {
+  padding-right: 52px;
+}
+
+.auth-input-prefix {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+.auth-input.has-prefix {
+  padding-left: 62px;
+}
+
+.auth-eye {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+}
+
+/* ----------------------------------------------------------
+   BUTTONS
+   ---------------------------------------------------------- */
+
+.auth-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 300px;
+  height: 54px;
+  margin: 8px auto 0;
+  border-radius: 999px;
+  background: var(--color-heading);
+  color: var(--color-card-solid);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.auth-btn:active {
+  transform: scale(0.98);
+}
+
+.auth-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.auth-btn-spinner {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: auth-spin 0.7s linear infinite;
+}
+
+.auth-btn.is-loading .auth-btn-spinner {
+  display: inline-block;
+}
+
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
+.auth-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 300px;
+  height: 50px;
+  margin: 18px auto 0;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+/* ----------------------------------------------------------
+   OTP BOXES (Verify screen). Restyles the existing .otp-row and
+   .otp-box only inside the auth card; the ids and logic on the
+   Verify screen don't change.
+   ---------------------------------------------------------- */
+
+.auth-card .otp-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 4px 0 18px;
+}
+
+.auth-card .otp-box {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card-solid);
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.08);
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-heading);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.auth-card .otp-box:focus {
+  border-color: var(--color-accent);
+}
+
+.auth-card .resend-row {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-heading);
+  margin: 0 0 24px;
+}
+
+.auth-card .resend-row a {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+/* ----------------------------------------------------------
+   WELCOME SCREEN: logo on top, orange panel at the bottom
+   ---------------------------------------------------------- */
+
+.auth-welcome {
+  margin: calc(var(--screen-padding) * -1);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary);
+}
+
+.auth-welcome-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.auth-welcome-logo {
+  width: 96px;
+  height: 96px;
+}
+
+.auth-welcome-tagline {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.auth-welcome-panel {
+  flex-shrink: 0;
+  padding: 30px 24px calc(env(safe-area-inset-bottom, 0px) + 34px);
+  background: var(--auth-orange);
+  border-radius: 28px 28px 0 0;
+  color: #FFFFFF;
+}
+
+.auth-welcome-panel h2 {
+  font-size: 26px;
+  font-weight: 800;
+  color: #FFFFFF;
+}
+
+.auth-welcome-panel p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.92);
+  margin-top: 8px;
+  max-width: 300px;
+}
+
+.auth-pill-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.auth-pill {
+  flex: 1;
+  height: 50px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: transform var(--transition-fast);
+}
+
+.auth-pill:active {
+  transform: scale(0.98);
+}
+
+.auth-pill-dark {
+  background: #1C1F26;
+  color: #FFFFFF;
+}
+
+.auth-pill-light {
+  background: #FFFFFF;
+  color: #1C1F26;
+}

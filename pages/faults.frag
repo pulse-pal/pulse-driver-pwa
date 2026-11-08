@@ -22,17 +22,23 @@
     <div id="faults-history-list" style="display:none;"></div>
   </div>
 
-  <div style="margin-bottom:24px;">
+  <div id="faults-service-section" data-requires="service_reminders" style="margin-bottom:24px;">
     <p style="font-size:13px;font-weight:700;color:var(--color-heading);margin-bottom:10px;">Service Reminders</p>
     <div id="faults-service-list"></div>
   </div>
 
-  <button class="btn btn-primary" id="faults-find-mechanic-btn" style="border-radius:999px;">FIND A MECHANIC →</button>
+  <button class="btn btn-primary" id="faults-find-mechanic-btn" data-requires="mechanic_booking" style="border-radius:999px;">FIND A MECHANIC →</button>
 
 </div>
 
 <script>
 (function () {
+  // Repair costs (KES), service reminders and mechanic booking are for
+  // individual drivers. Fleet drivers never see prices; their manager
+  // handles repairs and servicing.
+  const showCost = canUse('mechanic_booking')
+  const showService = canUse('service_reminders')
+
   function renderHealthGauge() {
     const faultCount = ACTIVE_VEHICLE.fault_codes.length
     const score = faultCount === 0 ? 100 : Math.max(40, 100 - faultCount * 28)
@@ -94,6 +100,12 @@
       }
       const borderColor = severityColors[fault.severity] || 'var(--color-border)'
 
+      const costRow = showCost ? `
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+              <span style="font-size:10.5px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.4px;">Est. Cost</span>
+              <span style="font-size:13px;font-weight:700;color:var(--color-heading);">${formatKESRange(fault.cost_min, fault.cost_max)}</span>
+            </div>` : ''
+
       html += `
         <div class="card ${isCritical ? 'pulsing-fault-card' : ''}" style="border-left:4px solid ${borderColor};">
           ${isCritical ? `<div style="background:var(--color-danger);color:#fff;font-size:12px;font-weight:800;text-align:center;padding:7px;border-radius:8px;margin-bottom:12px;letter-spacing:0.4px;">🔴 CRITICAL — STOP DRIVING</div>` : ''}
@@ -112,11 +124,7 @@
             <div style="display:flex;justify-content:space-between;align-items:baseline;">
               <span style="font-size:10.5px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.4px;">Status</span>
               <span style="font-size:13px;font-weight:700;color:${fault.can_drive ? 'var(--color-warning)' : 'var(--color-danger)'};">${fault.can_drive ? '⚠️ Drive carefully' : '🛑 Do not drive'}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:baseline;">
-              <span style="font-size:10.5px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.4px;">Est. Cost</span>
-              <span style="font-size:13px;font-weight:700;color:var(--color-heading);">${formatKESRange(fault.cost_min, fault.cost_max)}</span>
-            </div>
+            </div>${costRow}
           </div>
           <button class="btn btn-outline btn-sm fault-view-details-btn" data-code="${fault.code}" style="width:auto;border-radius:999px;">VIEW DETAILS</button>
         </div>
@@ -178,6 +186,10 @@
   renderHealthGauge()
   renderActiveFaults()
   renderHistory()
-  renderServiceReminders()
+  if (showService) renderServiceReminders()
+
+  // Hide the Service Reminders section and Find a Mechanic button for
+  // accounts that can't use them (marked with data-requires above).
+  applyFeatureGating(document.getElementById('faults-page'))
 })()
 </script>

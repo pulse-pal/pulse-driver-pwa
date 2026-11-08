@@ -1,5 +1,33 @@
 <div id="home-page">
 
+  <div id="home-fleet-chip-row" class="hidden" style="margin-bottom:12px;">
+    <span style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:var(--color-card-solid);border:1px solid var(--color-border);font-size:12.5px;font-weight:600;color:var(--color-heading);">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--color-accent);flex-shrink:0;">
+        <path d="M2 6H14V16H2V6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M14 10H18L21 13V16H14V10Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <circle cx="7" cy="17.5" r="1.8" fill="var(--color-card-solid)" stroke="currentColor" stroke-width="1.8"/>
+        <circle cx="17" cy="17.5" r="1.8" fill="var(--color-card-solid)" stroke="currentColor" stroke-width="1.8"/>
+      </svg>
+      <span id="home-fleet-chip-text"></span>
+    </span>
+  </div>
+
+  <div id="home-trip-card" class="card hidden" style="margin-bottom:14px;border:1.5px solid var(--color-accent);">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:38px;height:38px;border-radius:50%;background:rgba(255,122,26,0.12);color:var(--color-accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M12 5L6 11M12 5L18 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="min-width:0;flex:1;">
+        <p id="home-trip-title" style="font-weight:700;font-size:14px;color:var(--color-heading);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></p>
+        <p id="home-trip-sub" style="font-size:12.5px;color:var(--color-text-secondary);margin-top:2px;"></p>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button class="btn btn-primary btn-sm" id="home-trip-continue-btn" style="flex:1;border-radius:999px;">CONTINUE</button>
+      <button class="btn btn-outline btn-sm" id="home-trip-end-btn" style="flex:1;border-radius:999px;color:var(--color-danger);">END</button>
+    </div>
+  </div>
+
   <div class="gradient-stat-row">
     <div class="gradient-chip gradient-chip-fuel">
       <p class="gradient-chip-label">FUEL</p>
@@ -48,6 +76,12 @@
 
   <div id="home-fault-banner" class="card fault-banner-glow" style="margin-bottom:16px;"></div>
 
+  <div id="home-fleet-actions" class="hidden" style="margin-bottom:16px;">
+    <p class="settings-group-label" style="margin-top:0;">Quick actions</p>
+    <div id="home-fleet-tiles" style="display:grid;gap:10px;"></div>
+    <button class="btn btn-outline" id="home-fleet-call-btn" style="margin-top:10px;border-radius:999px;">CALL FLEET MANAGER</button>
+  </div>
+
   <div class="card" style="margin-bottom:8px;">
     <p class="settings-group-label" style="margin-top:0;">Today</p>
     <div class="stat-grid" id="home-today-grid"></div>
@@ -57,8 +91,15 @@
 
 <script>
 (function () {
+  // Owners see the vehicle name (they can have several vehicles).
+  // A fleet driver has one assigned vehicle, so the title is the
+  // fleet name instead and the plate sits in the chip below.
   const titleEl = document.getElementById('top-bar-title')
-  if (titleEl) titleEl.textContent = `${ACTIVE_VEHICLE.make} ${ACTIVE_VEHICLE.model} ${ACTIVE_VEHICLE.year}`
+  if (titleEl) {
+    titleEl.textContent = canUse('fleet_contact')
+      ? (DRIVER.fleet_name || 'Home')
+      : `${ACTIVE_VEHICLE.make} ${ACTIVE_VEHICLE.model} ${ACTIVE_VEHICLE.year}`
+  }
 
   // The scale the tick labels were last drawn for. updateDashboard
   // compares this with getSpeedoMax() every tick and redraws the
@@ -117,6 +158,115 @@
     }
   }
 
+  // Fleet drivers only: a chip with the assigned vehicle's plate and
+  // a row of quick actions. Individual drivers never see either.
+  // Every tile is filtered through canUse(), so a fleet plan decides
+  // what appears.
+  function renderFleetHome() {
+    if (!canUse('fleet_contact')) return
+
+    document.getElementById('home-fleet-chip-text').textContent = ACTIVE_VEHICLE.plate
+    document.getElementById('home-fleet-chip-row').classList.remove('hidden')
+
+    const icons = {
+      faults: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3L22 20H2L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10V14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>`,
+      trips: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 19V13C4 9.13401 7.13401 6 11 6H12C15.866 6 19 9.13401 19 13V19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2 19H22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="19" r="1.4" fill="currentColor"/><circle cx="16" cy="19" r="1.4" fill="currentColor"/><path d="M11.5 3V6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+      map: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 20L3 18V5L9 7M9 20L15 18M9 20V7M15 18L21 20V7L15 5M15 18V5M9 7L15 5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+      fuel: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 20h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7.5 8h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 9h2.5a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V9l-2.5-2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    }
+
+    const tiles = [
+      { feature: 'faults', page: 'faults', label: 'Faults', icon: icons.faults },
+      { feature: 'trips', page: 'trips', label: 'Trips', icon: icons.trips },
+      { feature: 'map', page: 'map', label: 'Map', icon: icons.map },
+      { feature: 'fuel_navigator', page: 'fuel-navigator', label: 'Fuel Nav', icon: icons.fuel }
+    ].filter(t => canUse(t.feature))
+
+    const grid = document.getElementById('home-fleet-tiles')
+    grid.style.gridTemplateColumns = `repeat(${tiles.length}, 1fr)`
+    grid.innerHTML = tiles.map(t => `
+      <button class="home-fleet-tile" data-page="${t.page}" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px;background:var(--color-card-solid);border:1px solid var(--color-border);border-radius:var(--radius-md);color:var(--color-heading);font-size:12.5px;font-weight:600;">
+        <span style="color:var(--color-accent);">${t.icon}</span>
+        ${t.label}
+      </button>
+    `).join('')
+
+    grid.querySelectorAll('.home-fleet-tile').forEach(btn => {
+      btn.addEventListener('click', () => navigateTo(btn.dataset.page))
+    })
+
+    document.getElementById('home-fleet-call-btn').addEventListener('click', callFleetManager)
+    document.getElementById('home-fleet-actions').classList.remove('hidden')
+  }
+
+  /* ----------------------------------------------------------
+     Resume trip card. Visible only while a trip is started and
+     not yet arrived, for accounts that can use Fuel Navigator.
+     app.js moves the trip forward; this only shows it.
+     ---------------------------------------------------------- */
+  function tripIsRunning() {
+    const t = ACTIVE_FUEL_ROUTE
+    return !!(t && t.status === 'active' && !t.arrived && canUse('fuel_navigator'))
+  }
+
+  // Small confirm dialog. It lives on <body>, so it is removed BEFORE
+  // the action runs (otherwise it would stay over the next screen).
+  function confirmEndTrip(destinationName, onConfirm) {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    overlay.innerHTML = `
+      <div class="modal-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:6px;">End trip?</h3>
+        <p style="font-size:13px;color:var(--color-text-secondary);" data-role="text"></p>
+        <button class="btn btn-danger" data-role="ok" style="margin:18px 0 10px;">END TRIP</button>
+        <button class="btn btn-ghost" data-role="cancel">KEEP GOING</button>
+      </div>
+    `
+    document.body.appendChild(overlay)
+    overlay.querySelector('[data-role="text"]').textContent =
+      `Stop your trip to ${destinationName}? You can plan a new one any time.`
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
+    overlay.querySelector('[data-role="cancel"]').addEventListener('click', () => overlay.remove())
+    overlay.querySelector('[data-role="ok"]').addEventListener('click', () => {
+      overlay.remove()
+      onConfirm()
+    })
+  }
+
+  let tripCardWired = false
+
+  function renderTripCard() {
+    const card = document.getElementById('home-trip-card')
+    if (!card) return
+
+    if (!tripIsRunning()) {
+      card.classList.add('hidden')
+      return
+    }
+
+    const t = ACTIVE_FUEL_ROUTE
+    const totalKm = t.total_km || t.distance_km || 0
+    const leftKm = Math.max(0, totalKm - (t.distanceTraveled || 0))
+
+    document.getElementById('home-trip-title').textContent = `Heading to ${t.destinationName}`
+    document.getElementById('home-trip-sub').textContent = `${Math.round(leftKm)} km left`
+    card.classList.remove('hidden')
+
+    // Buttons are wired once; later ticks only change the text.
+    if (tripCardWired) return
+    tripCardWired = true
+
+    document.getElementById('home-trip-continue-btn').addEventListener('click', () => navigateTo('map'))
+    document.getElementById('home-trip-end-btn').addEventListener('click', () => {
+      const trip = ACTIVE_FUEL_ROUTE
+      if (!trip) return
+      confirmEndTrip(trip.destinationName, () => {
+        clearActiveTrip()
+        renderTripCard()
+      })
+    })
+  }
+
   function renderTodaySummary() {
     const grid = document.getElementById('home-today-grid')
     if (!grid) return
@@ -135,7 +285,7 @@
         <p class="stat-tile-value">${todayTrips.length}</p>
       </div>
     `
-    if (DRIVER.plan === 'premium' && avgScore !== null) {
+    if (canUse('driving_score') && avgScore !== null) {
       html += `
         <div class="stat-tile" style="grid-column: span 2;">
           <p class="stat-tile-label">Driving Score Today</p>
@@ -178,11 +328,17 @@
 
     document.getElementById('home-rpm-value').textContent = Math.round(v.rpm).toLocaleString()
     document.getElementById('home-load-value').textContent = `${Math.round(v.engine_load)}%`
+
+    // Keeps the trip card's km-left in step with the simulation, and
+    // hides it the moment the trip ends or the car arrives.
+    renderTripCard()
   }
 
   renderGaugeTicks()
   renderFaultBanner()
+  renderFleetHome()
   renderTodaySummary()
+  renderTripCard()
   window.updateDashboard()
 })()
 </script>

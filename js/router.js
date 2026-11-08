@@ -5,11 +5,14 @@
 
 const ONBOARDING_PAGES = [
   'splash',
+  'welcome',
   'onboarding-device',
   'onboarding-verify',
   'onboarding-password',
+  'forgot-password',
   'subscribe',
-  'login'
+  'login',
+  'fleet-welcome'
 ]
 
 const TRANSPARENT_TOPBAR_PAGES = ['map', 'fuel-navigator']
@@ -68,6 +71,60 @@ const NAV_TAB_FOR_PAGE = {
   about: 'settings',
   'help-faq': 'settings',
   'deactivate-account': 'settings'
+}
+
+/* ----------------------------------------------------------
+   ROUTE GUARD
+   Which canUse() feature each page belongs to. If a FLEET driver
+   navigates to a page whose feature their fleet plan doesn't
+   include, the page is not loaded: the locked prompt ("Not
+   available on your fleet's plan. Ask {manager} to enable it.")
+   opens over the current page instead.
+
+   The guard applies to fleet drivers only. Individual drivers keep
+   the per-page checks they already have, so their flow is unchanged.
+   Pages not listed here (e.g. profile, settings, security, about,
+   help-faq, notification-preferences, trip detail's own sections)
+   are open to every account and gate their own inner sections.
+   ---------------------------------------------------------- */
+
+const PAGE_FEATURE = {
+  home: 'dashboard',
+  faults: 'faults',
+  'fault-detail': 'faults',
+  map: 'map',
+  trips: 'trips',
+  'trip-detail': 'trips',
+  'device-status': 'device_status',
+
+  'trip-coaching': 'trip_coaching',
+  'fuel-navigator': 'fuel_navigator',
+  'speed-alerts': 'speed_alerts',
+  'pulse-ai': 'pulse_ai',
+
+  mechanics: 'mechanic_booking',
+  'mechanic-detail': 'mechanic_booking',
+  'service-reminders': 'service_reminders',
+  'vehicle-sharing': 'vehicle_sharing',
+  'my-vehicles': 'my_vehicles',
+  'add-vehicle': 'add_vehicle',
+  subscription: 'subscription',
+  'deactivate-account': 'deactivate_account',
+
+  // Individual onboarding steps a fleet driver must never reach:
+  // pairing a device by code, and choosing a paid plan.
+  'onboarding-device': 'add_vehicle',
+  subscribe: 'subscription',
+
+  // The fleet welcome screen is part of the fleet onboarding path.
+  'fleet-welcome': 'fleet_contact'
+}
+
+function getBlockedFeature(page) {
+  if (!isFleetDriver()) return null
+  const feature = PAGE_FEATURE[page]
+  if (!feature) return null
+  return canUse(feature) ? null : feature
 }
 
 let currentPage = null
@@ -153,6 +210,14 @@ function updateFaultBadge() {
 }
 
 function navigateTo(page) {
+  // Route guard: a fleet driver can't open a page outside their fleet
+  // plan. Show the locked prompt and stay where they are.
+  const blockedFeature = getBlockedFeature(page)
+  if (blockedFeature) {
+    showLockedPrompt(blockedFeature)
+    return
+  }
+
   const content = document.getElementById('content')
   content.style.opacity = '0'
   setTimeout(() => {

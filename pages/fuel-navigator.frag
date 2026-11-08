@@ -34,14 +34,60 @@
 
   document.getElementById('fn-back-btn').addEventListener('click', () => navigateTo('map'))
 
-  function selectDestination(dest) {
+  // Picking a destination only PREVIEWS the route. The trip does not
+  // start (and is not saved) until the driver taps Start on the Map.
+  function startPreview(dest) {
     ACTIVE_FUEL_ROUTE = {
       destinationName: dest.name,
       lat: dest.lat,
       lng: dest.lng,
-      distance_km: dest.distance_km
+      distance_km: dest.distance_km,
+      status: 'preview'
     }
     navigateTo('map')
+  }
+
+  // A trip is already running: don't drop it silently.
+  function confirmSwitch(current, dest) {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    overlay.innerHTML = `
+      <div class="modal-card">
+        <h3 style="font-size:16px;font-weight:700;margin-bottom:6px;">Change your trip?</h3>
+        <p style="font-size:13px;color:var(--color-text-secondary);" id="fn-switch-text"></p>
+        <button class="btn btn-primary" id="fn-switch-confirm" style="margin:18px 0 10px;"></button>
+        <button class="btn btn-ghost" id="fn-switch-cancel">KEEP CURRENT TRIP</button>
+      </div>
+    `
+    document.body.appendChild(overlay)
+
+    document.getElementById('fn-switch-text').textContent =
+      `You're already heading to ${current.destinationName}. Switching to ${dest.name} will end that trip.`
+    document.getElementById('fn-switch-confirm').textContent = `SWITCH TO ${dest.name.toUpperCase()}`
+
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
+    document.getElementById('fn-switch-cancel').addEventListener('click', () => overlay.remove())
+    document.getElementById('fn-switch-confirm').addEventListener('click', () => {
+      // The dialog lives on <body>, outside the page, so it has to be
+      // removed before leaving or it stays on top of the next screen.
+      overlay.remove()
+      clearActiveTrip()
+      startPreview(dest)
+    })
+  }
+
+  function selectDestination(dest) {
+    const current = ACTIVE_FUEL_ROUTE
+    if (current && current.status === 'active' && !current.arrived) {
+      if (current.destinationName === dest.name) {
+        // Already heading there: just go back to it.
+        navigateTo('map')
+        return
+      }
+      confirmSwitch(current, dest)
+      return
+    }
+    startPreview(dest)
   }
 
   function renderDestinationList() {

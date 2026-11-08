@@ -1,28 +1,312 @@
 /* ==========================================================
    PULSEPAL DRIVER — APP.JS
-   Startup, live data simulation, service worker registration,
-   the persistent floating Pulse AI assistant, and the
-   notification bell dropdown
+   Startup, feature gate (canUse), live data simulation,
+   service worker registration, the persistent floating
+   Pulse AI assistant, and the notification bell dropdown
    ========================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
   registerServiceWorker()
   applyStoredTheme()
-  loadPage('splash')
+  applyFeatureGating()
 
-  setTimeout(() => {
-    const isLoggedIn = localStorage.getItem('pulsepal_logged_in') === 'true'
-    if (isLoggedIn) {
-      navigateTo('home')
-    } else {
-      navigateTo('onboarding-device')
-    }
-  }, 2000)
+  // A fuel trip the driver started and never ended comes back here.
+  restoreActiveTrip()
+
+  // Right after the login screen recognises a number it saves the
+  // account and reloads (so the right profile loads). If it asked to
+  // pick up on a particular screen, go straight there: no splash.
+  const resumePage = takeResumePage()
+  if (resumePage) {
+    navigateTo(resumePage)
+  } else {
+    loadPage('splash')
+
+    setTimeout(() => {
+      const isLoggedIn = localStorage.getItem('pulsepal_logged_in') === 'true'
+      if (isLoggedIn) {
+        navigateTo('home')
+      } else if (isFleetDriver()) {
+        // A fleet profile is already loaded (dev switch, or a fleet
+        // number that started signing in): straight to Login.
+        navigateTo('login')
+      } else {
+        // Everyone else starts at Welcome: Sign in (returning, or
+        // added by a fleet manager) or Get Started (new, activates
+        // a device). The login screen works out which kind of
+        // account a phone number belongs to.
+        navigateTo('welcome')
+      }
+    }, 2000)
+  }
 
   startLiveDataSimulation()
   initPulseAiFab()
   initNotificationBell()
 })
+
+/* ----------------------------------------------------------
+   ACCOUNT SWITCH + RESUME
+   The account type and plan are applied when dummy-data.js loads,
+   so signing in as a different kind of account means saving the
+   number and reloading once. Only these screens may be resumed.
+   ---------------------------------------------------------- */
+
+const RESUME_KEY = 'pulsepal_resume'
+const RESUMABLE_PAGES = ['onboarding-verify', 'onboarding-password', 'login']
+
+// Reads and clears the resume note. One use only, so a later
+// refresh starts normally.
+function takeResumePage() {
+  try {
+    const raw = sessionStorage.getItem(RESUME_KEY)
+    if (!raw) return null
+    sessionStorage.removeItem(RESUME_KEY)
+    const note = JSON.parse(raw)
+    return note && RESUMABLE_PAGES.includes(note.page) ? note.page : null
+  } catch (e) {
+    return null
+  }
+}
+
+// Saves the account and reloads so that account's profile loads.
+// resumePage (optional) is the screen to open after the reload.
+// Reloads to the bare path so a leftover ?mode= in the address bar
+// can't override the account that just signed in.
+window.switchAccountAndReload = function (rawPhone, resumePage) {
+  saveSignedInAccount(rawPhone)
+  if (resumePage && RESUMABLE_PAGES.includes(resumePage)) {
+    try {
+      sessionStorage.setItem(RESUME_KEY, JSON.stringify({ page: resumePage }))
+    } catch (e) {}
+  }
+  window.location.href = window.location.pathname
+}
+
+/* ----------------------------------------------------------
+   ACTIVE FUEL TRIP
+   A fuel route the driver has started (Fuel Navigator -> Map ->
+   Start) must outlive the screen it was started on and the app
+   itself. The route lives in ACTIVE_FUEL_ROUTE (dummy-data.js);
+   while its status is 'active' it is saved to this browser, so it
+   comes back after leaving the Map or closing the app.
+
+   status: 'preview' (route chosen, not started: never saved) or
+           'active'  (started: saved, progress keeps moving).
+
+   Progress (distanceTraveled, in km) lives here, not on the Map
+   page, so the trip keeps moving while the driver is on another
+   screen. In the prototype it is advanced by the simulated speed
+   each tick. With real data the backend works it out from the
+   car's live position on the route and sends the alerts.
+   ---------------------------------------------------------- */
+
+const ACTIVE_TRIP_KEY = 'pulsepal_active_trip'
+
+// One saved trip per account.
+function activeTripStorageKey() {
+  return ACTIVE_TRIP_KEY + '_' + DRIVER.phone
+}
+
+function persistActiveTrip() {
+  const route = ACTIVE_FUEL_ROUTE
+  if (!route || route.status !== 'active' || route.arrived) return
+  try {
+    localStorage.setItem(activeTripStorageKey(), JSON.stringify({
+      plate: ACTIVE_VEHICLE.plate,
+      destinationName: route.destinationName,
+      lat: route.lat,
+      lng: route.lng,
+      selectedRouteIndex: route.selectedRouteIndex || 0,
+      distance_km: route.distance_km || 0,
+      duration_min: route.duration_min || 0,
+      total_km: route.total_km || 0,
+      distanceTraveled: route.distanceTraveled || 0
+    }))
+  } catch (e) {}
+}
+
+function removeStoredTrip() {
+  try { localStorage.removeItem(activeTripStorageKey()) } catch (e) {}
+}
+
+// Ends the trip: forgets it in memory and in the browser.
+function clearActiveTrip() {
+  ACTIVE_FUEL_ROUTE = null
+  removeStoredTrip()
+}
+
+// Puts a saved trip back into ACTIVE_FUEL_ROUTE at startup. Ignored
+// if it belongs to another vehicle, or the account can't use Fuel
+// Navigator (e.g. a fleet plan without it).
+function restoreActiveTrip() {
+  if (!canUse('fuel_navigator')) return
+  try {
+    const raw = localStorage.getItem(activeTripStorageKey())
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    if (!saved || saved.plate !== ACTIVE_VEHICLE.plate) return
+    if (!saved.destinationName || typeof saved.lat !== 'number' || typeof saved.lng !== 'number') return
+
+    ACTIVE_FUEL_ROUTE = {
+      destinationName: saved.destinationName,
+      lat: saved.lat,
+      lng: saved.lng,
+      selectedRouteIndex: saved.selectedRouteIndex || 0,
+      distance_km: saved.distance_km || 0,
+      duration_min: saved.duration_min || 0,
+      total_km: saved.total_km || 0,
+      distanceTraveled: saved.distanceTraveled || 0,
+      status: 'active'
+    }
+  } catch (e) {}
+}
+
+// Moves an active trip forward by the distance driven this tick and
+// ends it when the car gets there.
+function advanceActiveTrip(kmThisTick) {
+  const route = ACTIVE_FUEL_ROUTE
+  if (!route || route.status !== 'active' || route.arrived) return
+
+  route.distanceTraveled = (route.distanceTraveled || 0) + kmThisTick
+
+  const total = route.total_km || route.distance_km || 0
+  if (total > 0 && route.distanceTraveled >= total) {
+    route.arrived = true
+    removeStoredTrip()
+
+    NOTIFICATIONS.unshift({
+      type: 'trip',
+      title: 'You have arrived',
+      message: `Arrived at ${route.destinationName}`,
+      time: 'Just now',
+      read: false
+    })
+    if (typeof window.refreshNotificationBell === 'function') {
+      window.refreshNotificationBell()
+    }
+    showToast(`Arrived at ${route.destinationName}`, 'success')
+    return
+  }
+
+  persistActiveTrip()
+}
+
+/* ----------------------------------------------------------
+   FEATURE GATE
+   canUse(featureKey) is the ONE place that decides whether the
+   current account can use a feature. Screens, nav items and quick
+   actions call it; nothing else in the app should read
+   DRIVER.plan or DRIVER.fleet_plan to make an access decision.
+
+   Four account states (columns, in this order):
+     0  individual driver, Starter
+     1  individual driver, Premium
+     2  fleet driver, Fleet Starter
+     3  fleet driver, Fleet Premium
+
+   This is a UI gate only. Real enforcement has to happen on the
+   backend, where the plan lives in the database.
+   ---------------------------------------------------------- */
+
+const FEATURE_ACCESS = {
+  //                          Ind.Starter  Ind.Premium  Fleet.Starter  Fleet.Premium
+
+  // Everyone
+  dashboard:                 [true,        true,        true,          true],
+  faults:                    [true,        true,        true,          true],
+  map:                       [true,        true,        true,          true],
+  trips:                     [true,        true,        true,          true],
+  device_status:             [true,        true,        true,          true],
+
+  // Premium: individual Premium and Fleet Premium
+  trip_coaching:             [false,       true,        false,         true],
+  driving_score:             [false,       true,        false,         true],
+  fuel_navigator:            [false,       true,        false,         true],
+  speed_alerts:              [false,       true,        false,         true],
+  pulse_ai:                  [false,       true,        false,         true],
+
+  // Individual drivers only (never fleet drivers)
+  mechanic_booking:          [true,        true,        false,         false],
+  service_reminders:         [true,        true,        false,         false],
+  vehicle_sharing:           [true,        true,        false,         false],
+  vehicle_sharing_advanced:  [false,       true,        false,         false],
+  my_vehicles:               [true,        true,        false,         false],
+  add_vehicle:               [true,        true,        false,         false],
+  subscription:              [true,        true,        false,         false],
+  billing:                   [true,        true,        false,         false],
+  payment_reminders:         [true,        true,        false,         false],
+  deactivate_account:        [true,        true,        false,         false],
+
+  // Fleet drivers only: call / notify the fleet manager, "My Fleet" card
+  fleet_contact:             [false,       false,       true,          true]
+}
+
+// Older keys used by existing checkPremium(...) calls, mapped to
+// the feature names above so those call sites keep working.
+const FEATURE_ALIASES = {
+  pulse_ai_chatbot: 'pulse_ai',
+  vehicle_sharing_basic: 'vehicle_sharing'
+}
+
+const _warnedFeatureKeys = new Set()
+
+function isFleetDriver() {
+  return DRIVER.account_type === 'fleet_driver'
+}
+
+function getAccessColumn() {
+  if (isFleetDriver()) {
+    return DRIVER.fleet_plan === 'fleet_premium' ? 3 : 2
+  }
+  return DRIVER.plan === 'premium' ? 1 : 0
+}
+
+function canUse(featureKey) {
+  const key = FEATURE_ALIASES[featureKey] || featureKey
+  const row = FEATURE_ACCESS[key]
+  const col = getAccessColumn()
+
+  if (row) return row[col] === true
+
+  // Unknown key: behave like the old checkPremium did (an unlisted key
+  // meant "Premium feature") for individuals, and stay locked for fleet
+  // drivers so nothing leaks. The warning lists keys to add above.
+  if (!_warnedFeatureKeys.has(featureKey)) {
+    _warnedFeatureKeys.add(featureKey)
+    console.warn('[canUse] unknown feature key:', featureKey)
+  }
+  return col === 1
+}
+
+// Hides any element marked data-requires="feature_key" when the
+// current account can't use that feature. Used for static markup
+// such as bottom-nav items. Safe to call repeatedly: it only undoes
+// hiding that it did itself.
+function applyFeatureGating(root) {
+  const scope = root || document
+  scope.querySelectorAll('[data-requires]').forEach(el => {
+    const allowed = canUse(el.dataset.requires)
+    if (!allowed) {
+      el.classList.add('hidden')
+      el.dataset.gateHidden = '1'
+    } else if (el.dataset.gateHidden === '1') {
+      el.classList.remove('hidden')
+      delete el.dataset.gateHidden
+    }
+  })
+}
+window.applyFeatureGating = applyFeatureGating
+
+// Opens the phone dialler to the fleet manager. Used by Home, fault
+// detail, Profile and the locked-feature prompt.
+function callFleetManager() {
+  if (!DRIVER.manager_phone) {
+    showToast('No manager number on file', 'warning')
+    return
+  }
+  window.location.href = 'tel:' + DRIVER.manager_phone
+}
 
 /* ----------------------------------------------------------
    THEME
@@ -128,6 +412,10 @@ function showUpdateBanner(waitingWorker) {
 const SERVICE_REMINDER_THRESHOLDS = [500, 100, 0]
 
 function trackServiceReminders(kmThisTick) {
+  // Service reminders aren't part of a fleet driver's plan: no
+  // countdown, no notifications.
+  if (!canUse('service_reminders')) return
+
   SERVICE_REMINDERS.forEach(reminder => {
     if (reminder.due_in_km <= 0) return
 
@@ -181,6 +469,7 @@ function startLiveDataSimulation() {
 
     const kmThisTick = ACTIVE_VEHICLE.speed * (3 / 3600)
     trackServiceReminders(kmThisTick)
+    advanceActiveTrip(kmThisTick)
 
     if (typeof window.updateDashboard === 'function') {
       window.updateDashboard()
@@ -194,6 +483,10 @@ function startLiveDataSimulation() {
 let faultToastShown = false
 
 window.initPage = function (page) {
+  // Pages are injected after startup, so re-apply data-requires to
+  // whatever the new fragment contains.
+  applyFeatureGating()
+
   if (page === 'home' && !faultToastShown && ACTIVE_VEHICLE.fault_codes.length > 0) {
     showToast(`Fault detected on ${ACTIVE_VEHICLE.plate}`, 'warning')
     faultToastShown = true

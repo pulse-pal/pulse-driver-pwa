@@ -83,7 +83,9 @@
 
 <script>
 (function () {
-  const isPremium = DRIVER.plan === 'premium'
+  // Driving scores and behaviour summaries: individual Premium and
+  // Fleet Premium. Decided by the shared gate, not the plan name.
+  const showScore = canUse('driving_score')
 
   function scoreStyle(score) {
     if (score >= 80) return { bg: 'rgba(34,165,89,0.12)', color: 'var(--color-success)' }
@@ -103,7 +105,7 @@
     document.getElementById('trips-stat-fuel').textContent = totalFuel.toFixed(1) + ' L'
 
     const scoreWrap = document.getElementById('trips-stat-score-wrap')
-    if (isPremium) {
+    if (showScore) {
       document.getElementById('trips-stat-score').textContent = avgScore + '/100'
     } else {
       scoreWrap.style.display = 'none'
@@ -130,7 +132,7 @@
               <span style="font-size:15px;font-weight:700;color:var(--color-heading);">${t.end}</span>
             </div>
           </div>
-          ${isPremium ? `
+          ${showScore ? `
             <div class="trips-score" style="background:${s.bg};color:${s.color};">
               ${t.score}<small>SCORE</small>
             </div>` : ''}
@@ -161,7 +163,7 @@
           </div>
         </div>
 
-        ${isPremium ? `
+        ${showScore ? `
           <p style="font-size:12px;margin-top:14px;color:${harsh + t.speeding === 0 ? 'var(--color-success)' : 'var(--color-text-secondary)'};">
             ${harsh + t.speeding === 0
               ? 'Clean trip, no harsh events'

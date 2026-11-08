@@ -21,7 +21,19 @@ function showToast(message, type = 'success') {
 }
 
 /* ----------------------------------------------------------
-   PREMIUM FEATURE GATE
+   FEATURE GATE PROMPTS
+   Whether a feature is allowed is decided ONLY by canUse() in
+   app.js. This section decides what the driver sees when it
+   isn't:
+     - individual drivers: the upgrade modal (KES prices, button
+       to the Subscription page), exactly as before
+     - fleet drivers: "Not available on your fleet's plan. Ask
+       {manager} to enable it." with a call button. Never any
+       KES price or M-Pesa.
+
+   PREMIUM_FEATURES is keyed by the older feature keys that
+   existing pages already pass to checkPremium(). `gate` maps an
+   older key to its canUse() key where the names differ.
    ---------------------------------------------------------- */
 
 const PREMIUM_FEATURES = {
@@ -31,7 +43,8 @@ const PREMIUM_FEATURES = {
   },
   pulse_ai_chatbot: {
     name: 'Pulse AI Assistant',
-    pitch: 'Chat with an AI that understands your vehicle\'s faults and answers questions in plain language.'
+    pitch: 'Chat with an AI that understands your vehicle\'s faults and answers questions in plain language.',
+    gate: 'pulse_ai'
   },
   trip_coaching: {
     name: 'Trip Coaching',
@@ -39,7 +52,8 @@ const PREMIUM_FEATURES = {
   },
   speed_camera_alerts: {
     name: 'Speed Camera Alerts',
-    pitch: 'Get warned before fixed speed cameras and community-reported police checks.'
+    pitch: 'Get warned before fixed speed cameras and community-reported police checks.',
+    gate: 'speed_alerts'
   },
   vehicle_sharing_advanced: {
     name: 'Advanced Vehicle Sharing',
@@ -47,13 +61,103 @@ const PREMIUM_FEATURES = {
   }
 }
 
-function checkPremium(featureKey) {
-  if (DRIVER.plan === 'premium') return true
-  showUpgradePrompt(featureKey)
+// Display names for gated features that aren't in PREMIUM_FEATURES
+// (mostly features a fleet driver doesn't have). Used as the title
+// of the locked prompt.
+const FEATURE_NAMES = {
+  pulse_ai: 'Pulse AI Assistant',
+  speed_alerts: 'Speed Alerts',
+  driving_score: 'Driving Score',
+  mechanic_booking: 'Mechanic Booking',
+  service_reminders: 'Service Reminders',
+  vehicle_sharing: 'Vehicle Sharing',
+  my_vehicles: 'My Vehicles',
+  add_vehicle: 'Add Vehicle',
+  subscription: 'Subscription',
+  billing: 'Billing'
+}
+
+function getFeatureGateKey(featureKey) {
+  const info = PREMIUM_FEATURES[featureKey]
+  return (info && info.gate) || featureKey
+}
+
+function getFeatureName(featureKey) {
+  const info = PREMIUM_FEATURES[featureKey]
+  if (info && info.name) return info.name
+  return FEATURE_NAMES[getFeatureGateKey(featureKey)] || FEATURE_NAMES[featureKey] || 'This feature'
+}
+
+// Use for any action behind a feature: returns true if allowed,
+// otherwise shows the right locked prompt and returns false.
+//   if (!requireFeature('fuel_navigator')) return
+function requireFeature(featureKey) {
+  if (canUse(getFeatureGateKey(featureKey))) return true
+  showLockedPrompt(featureKey)
   return false
 }
 
+// Kept so existing pages keep working unchanged.
+function checkPremium(featureKey) {
+  return requireFeature(featureKey)
+}
+
+function showLockedPrompt(featureKey) {
+  if (isFleetDriver()) {
+    showFleetLockedPrompt(featureKey)
+  } else {
+    showUpgradePrompt(featureKey)
+  }
+}
+
+function showFleetLockedPrompt(featureKey) {
+  const existing = document.getElementById('upgrade-modal')
+  if (existing) existing.remove()
+
+  const overlay = document.createElement('div')
+  overlay.id = 'upgrade-modal'
+  overlay.className = 'modal-overlay'
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <div class="upgrade-lock-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3 id="fleet-locked-title" style="font-size:17px;font-weight:700;margin-bottom:6px;"></h3>
+      <p id="fleet-locked-text" style="font-size:13px;color:var(--color-text-secondary);margin-bottom:18px;line-height:1.5;"></p>
+      <button class="btn btn-primary" id="fleet-locked-call" style="margin-bottom:10px;">CALL FLEET MANAGER</button>
+      <button class="btn btn-ghost" id="fleet-locked-close">CLOSE</button>
+    </div>
+  `
+
+  // Dynamic text is set with textContent, not interpolated into the
+  // markup, since names will come from the backend later.
+  overlay.querySelector('#fleet-locked-title').textContent = getFeatureName(featureKey)
+  overlay.querySelector('#fleet-locked-text').textContent =
+    `Not available on your fleet's plan. Ask ${DRIVER.manager_name || 'your fleet manager'} to enable it.`
+
+  document.body.appendChild(overlay)
+
+  document.getElementById('fleet-locked-close').addEventListener('click', closeUpgradePrompt)
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeUpgradePrompt()
+  })
+  document.getElementById('fleet-locked-call').addEventListener('click', () => {
+    closeUpgradePrompt()
+    callFleetManager()
+  })
+}
+
 function showUpgradePrompt(featureKey) {
+  // Safety net: a fleet driver must never see the priced upgrade modal,
+  // even if some page calls this function directly.
+  if (isFleetDriver()) {
+    showFleetLockedPrompt(featureKey)
+    return
+  }
+
   const feature = PREMIUM_FEATURES[featureKey] || {
     name: 'This feature',
     pitch: 'Unlock more with Premium.'

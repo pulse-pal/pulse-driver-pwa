@@ -41,7 +41,7 @@
     <p id="fd-cause-note" style="font-size:12.5px;color:var(--color-text-secondary);"></p>
   </div>
 
-  <div class="card" style="margin-bottom:20px;">
+  <div class="card" id="fd-cost-card" style="margin-bottom:20px;">
     <p style="font-size:11px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Estimated Repair Cost</p>
     <p id="fd-cost" style="font-size:22px;font-weight:800;color:var(--color-heading);"></p>
     <p style="font-size:12px;color:var(--color-text-secondary);margin-top:4px;">Depending on which part needs replacing</p>
@@ -86,6 +86,11 @@
     return
   }
 
+  // What this account can do about a fault. Individual drivers book a
+  // mechanic; a fleet driver notifies / calls the fleet manager instead.
+  const bookingAllowed = canUse('mechanic_booking')
+  const fleetContact = canUse('fleet_contact')
+
   const titleEl = document.getElementById('top-bar-title')
   if (titleEl) titleEl.textContent = fault.code
 
@@ -127,14 +132,22 @@
   document.getElementById('fd-cause').textContent = fault.most_likely_cause
   document.getElementById('fd-cause-note').textContent = fault.cause_note
 
-  document.getElementById('fd-cost').textContent = formatKESRange(fault.cost_min, fault.cost_max)
+  // Repair cost estimates (KES) are for the driver who pays for the
+  // repair. Fleet drivers never see prices: their manager handles it.
+  if (bookingAllowed) {
+    document.getElementById('fd-cost').textContent = formatKESRange(fault.cost_min, fault.cost_max)
+  } else {
+    document.getElementById('fd-cost-card').classList.add('hidden')
+  }
 
   const actionSentences = fault.action.split('. ').map(s => s.replace(/\.$/, ''))
   const steps = [
     fault.can_drive ? 'Continue driving carefully' : 'Stop driving — do not continue',
     actionSentences[1] || 'Avoid heavy acceleration',
     actionSentences[0] || 'Book a mechanic soon',
-    `Tell mechanic: "${fault.code} — ${fault.title}"`
+    fleetContact && !bookingAllowed
+      ? `Tell your fleet manager: "${fault.code} — ${fault.title}"`
+      : `Tell mechanic: "${fault.code} — ${fault.title}"`
   ]
 
   document.getElementById('fd-steps').innerHTML = steps.map((step, i) => `
@@ -144,26 +157,93 @@
     </div>
   `).join('')
 
-  document.getElementById('fd-book-mechanic-btn').addEventListener('click', () => navigateTo('mechanics'))
+  /* ---- Primary action: book a mechanic, or notify the fleet manager ---- */
 
-  document.getElementById('fd-ask-ai-btn').addEventListener('click', () => {
-    if (!checkPremium('pulse_ai_chatbot')) return
-    const fab = document.getElementById('pulse-ai-fab')
-    if (fab) fab.click()
-    setTimeout(() => {
-      const input = document.getElementById('pulse-ai-panel-input')
-      const sendBtn = document.getElementById('pulse-ai-panel-send')
-      if (input && sendBtn) {
-        input.value = `Tell me more about ${fault.code} — ${fault.title}`
-        sendBtn.click()
+  const bookBtn = document.getElementById('fd-book-mechanic-btn')
+
+  // Remembers which faults this session has already alerted the
+  // manager about, so the button can't be spammed.
+  window.FLEET_ALERTS_SENT = window.FLEET_ALERTS_SENT || new Set()
+  const alertKey = `${ACTIVE_VEHICLE.id}:${fault.code}`
+
+  function markNotified() {
+    bookBtn.disabled = true
+    bookBtn.style.opacity = '0.7'
+    bookBtn.querySelector('span').textContent = 'MANAGER NOTIFIED'
+  }
+
+  if (bookingAllowed) {
+    bookBtn.addEventListener('click', () => navigateTo('mechanics'))
+  } else if (fleetContact) {
+    bookBtn.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C10.34 2 9 3.34 9 5V5.29C6.51 6.14 4.75 8.5 4.75 11.25V15.5L3 18V19H21V18L19.25 15.5V11.25C19.25 8.5 17.49 6.14 15 5.29V5C15 3.34 13.66 2 12 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 21C9.5 22.1 10.62 23 12 23C13.38 23 14.5 22.1 14.5 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>NOTIFY FLEET MANAGER</span>
+    `
+    if (window.FLEET_ALERTS_SENT.has(alertKey)) markNotified()
+
+    bookBtn.addEventListener('click', () => {
+      if (window.FLEET_ALERTS_SENT.has(alertKey)) return
+      window.FLEET_ALERTS_SENT.add(alertKey)
+
+      // Dummy alert: a real build would send this to the fleet manager.
+      NOTIFICATIONS.unshift({
+        type: 'fleet',
+        title: 'Fleet Manager Notified',
+        message: `${DRIVER.manager_name || 'Your fleet manager'} was alerted about ${fault.code} — ${fault.title} on ${ACTIVE_VEHICLE.plate}`,
+        time: 'Just now',
+        read: false
+      })
+      if (typeof window.refreshNotificationBell === 'function') {
+        window.refreshNotificationBell()
       }
-    }, 100)
-  })
 
-  const nearestMechanic = MECHANICS[0]
+      markNotified()
+      showToast(`${DRIVER.manager_name || 'Your fleet manager'} has been notified`, 'success')
+    })
+  } else {
+    bookBtn.classList.add('hidden')
+  }
+
+  /* ---- Ask Pulse AI: a fleet driver only sees it if their plan has it ---- */
+
+  const askAiBtn = document.getElementById('fd-ask-ai-btn')
+
+  if (isFleetDriver() && !canUse('pulse_ai')) {
+    askAiBtn.classList.add('hidden')
+  } else {
+    askAiBtn.addEventListener('click', () => {
+      if (!checkPremium('pulse_ai_chatbot')) return
+      const fab = document.getElementById('pulse-ai-fab')
+      if (fab) fab.click()
+      setTimeout(() => {
+        const input = document.getElementById('pulse-ai-panel-input')
+        const sendBtn = document.getElementById('pulse-ai-panel-send')
+        if (input && sendBtn) {
+          input.value = `Tell me more about ${fault.code} — ${fault.title}`
+          sendBtn.click()
+        }
+      }, 100)
+    })
+  }
+
+  /* ---- Call button: nearest mechanic, or the fleet manager ---- */
+
   const callBtn = document.getElementById('fd-call-mechanic-btn')
-  callBtn.href = `tel:${nearestMechanic.phone}`
-  document.getElementById('fd-call-btn-text').textContent = `CALL ${nearestMechanic.garage.toUpperCase()}`
+
+  if (bookingAllowed) {
+    const nearestMechanic = MECHANICS[0]
+    callBtn.href = `tel:${nearestMechanic.phone}`
+    document.getElementById('fd-call-btn-text').textContent = `CALL ${nearestMechanic.garage.toUpperCase()}`
+  } else if (fleetContact) {
+    callBtn.href = '#'
+    callBtn.addEventListener('click', (e) => {
+      e.preventDefault()
+      callFleetManager()
+    })
+    document.getElementById('fd-call-btn-text').textContent = 'CALL FLEET MANAGER'
+  } else {
+    callBtn.classList.add('hidden')
+  }
 
   document.getElementById('fd-tech-toggle').addEventListener('click', () => {
     const details = document.getElementById('fd-tech-details')

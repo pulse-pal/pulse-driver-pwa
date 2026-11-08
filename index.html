@@ -40,6 +40,7 @@
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/pages.css">
+  <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/animations.css">
 
   <!-- Leaflet (map.html uses this) -->
@@ -74,9 +75,12 @@
     <!-- CONTENT: router.js injects the active page's markup here -->
     <main id="content" class="content"></main>
 
-    <!-- BOTTOM NAV: shown only on Layout 2 (main app) pages -->
+    <!-- BOTTOM NAV: shown only on Layout 2 (main app) pages.
+         data-requires="feature_key" hides a tab when canUse(feature_key)
+         is false for the current account (applied by app.js). Settings
+         has no gate: every account needs it. -->
     <nav id="bottom-nav" class="bottom-nav hidden">
-      <button class="nav-item" data-page="home" aria-label="Home">
+      <button class="nav-item" data-page="home" data-requires="dashboard" aria-label="Home">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 11.5L12 4L21 11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M5.5 10V19C5.5 19.5523 5.94772 20 6.5 20H17.5C18.0523 20 18.5 19.5523 18.5 19V10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -85,7 +89,7 @@
         <span class="nav-label">Home</span>
       </button>
 
-      <button class="nav-item" data-page="faults" aria-label="Faults">
+      <button class="nav-item" data-page="faults" data-requires="faults" aria-label="Faults">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 3L22 20H2L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
           <path d="M12 10V14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -95,14 +99,14 @@
         <span id="nav-fault-badge" class="nav-badge hidden">1</span>
       </button>
 
-      <button class="nav-item" data-page="map" aria-label="Map">
+      <button class="nav-item" data-page="map" data-requires="map" aria-label="Map">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M9 20L3 18V5L9 7M9 20L15 18M9 20V7M15 18L21 20V7L15 5M15 18V5M9 7L15 5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
         </svg>
         <span class="nav-label">Map</span>
       </button>
 
-      <button class="nav-item" data-page="trips" aria-label="Trips">
+      <button class="nav-item" data-page="trips" data-requires="trips" aria-label="Trips">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M4 19V13C4 9.13401 7.13401 6 11 6H12C15.866 6 19 9.13401 19 13V19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
           <path d="M2 19H22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>

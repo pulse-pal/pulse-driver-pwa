@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pulsepal-driver-v5'
+const CACHE_NAME = 'pulsepal-driver-v11'
 
 const urlsToCache = [
   '/',
@@ -11,6 +11,7 @@ const urlsToCache = [
   '/css/main.css',
   '/css/components.css',
   '/css/pages.css',
+  '/css/auth.css',
   '/css/animations.css',
 
   '/js/app.js',
@@ -20,9 +21,12 @@ const urlsToCache = [
   '/js/map.js',
 
   '/pages/splash.frag',
+  '/pages/welcome.frag',
   '/pages/onboarding-device.frag',
   '/pages/onboarding-verify.frag',
   '/pages/onboarding-password.frag',
+  '/pages/forgot-password.frag',
+  '/pages/fleet-welcome.frag',
   '/pages/subscribe.frag',
   '/pages/login.frag',
   '/pages/home.frag',
